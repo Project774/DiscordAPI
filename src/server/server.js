@@ -18,7 +18,115 @@ const commandData = [];
 const luaCommands = new Collection();
 const pendingInteractions = new Map();
 
-on('DiscordAPI:RegisterCommand', (name, description, options = []) => {
+const permissions = {
+    mod: [],
+    admin: [],
+    owner: []
+};
+
+const rolePermissions = {
+    mod: GetConvar('DiscordAPI_MOD_ROLES', 'MODERATOR_ROLE_ID').split(','),
+    admin: GetConvar('DiscordAPI_ADMIN_ROLES', 'ADMIN_ROLE_ID').split(','),
+    owner: GetConvar('DiscordAPI_OWNER_ROLES', 'OWNER_ROLE_ID').split(',')
+};
+
+const userPermissions = {
+    mod: GetConvar('DiscordAPI_MOD_USERS', '').split(',').filter(id => id.trim() !== ''),
+    admin: GetConvar('DiscordAPI_ADMIN_USERS', '').split(',').filter(id => id.trim() !== ''),
+    owner: GetConvar('DiscordAPI_OWNER_USERS', 'YOUR_DISCORD_USER_ID').split(',').filter(id => id.trim() !== '')
+};
+
+function hasPermission(userId, commandName) {
+    const guild = client.guilds.cache.get(guildId);
+    let member = null;
+    
+    if (guild) {
+        member = guild.members.cache.get(userId);
+    }
+
+    if (userPermissions.mod && userPermissions.mod.includes(userId)) {
+        if (permissions.mod && permissions.mod.includes(commandName)) {
+            return true;
+        }
+    }
+    
+    if (userPermissions.admin && userPermissions.admin.includes(userId)) {
+        if (permissions.admin && permissions.admin.includes(commandName)) {
+            return true;
+        }
+        if (permissions.mod && permissions.mod.includes(commandName)) {
+            return true;
+        }
+    }
+    
+    if (userPermissions.owner && userPermissions.owner.includes(userId)) {
+        return true;
+    }
+    
+    if (member && member.roles) {
+        for (const [roleId, role] of member.roles.cache) {
+            if (rolePermissions.mod && rolePermissions.mod.includes(roleId)) {
+                if (permissions.mod && permissions.mod.includes(commandName)) {
+                    return true;
+                }
+            }
+            
+            if (rolePermissions.admin && rolePermissions.admin.includes(roleId)) {
+                if (permissions.admin && permissions.admin.includes(commandName)) {
+                    return true;
+                }
+                if (permissions.mod && permissions.mod.includes(commandName)) {
+                    return true;
+                }
+            }
+            
+            if (rolePermissions.owner && rolePermissions.owner.includes(roleId)) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+exports('HasPermission', hasPermission);
+
+// Permission check function
+function getPermission(userId) {
+    const guild = client.guilds.cache.get(guildId);
+    let member = null;
+    
+    if (guild) {
+        member = guild.members.cache.get(userId);
+    }
+
+    if (userPermissions.owner && userPermissions.owner.includes(userId)) {
+        return 'owner';
+    }
+    if (userPermissions.admin && userPermissions.admin.includes(userId)) {
+        return 'admin';
+    }
+    if (userPermissions.mod && userPermissions.mod.includes(userId)) {
+        return 'mod';
+    }
+    
+    if (member && member.roles) {
+        for (const [roleId, role] of member.roles.cache) {
+            if (rolePermissions.owner && rolePermissions.owner.includes(roleId)) {
+                return 'owner';
+            }
+            if (rolePermissions.admin && rolePermissions.admin.includes(roleId)) {
+                return 'admin';
+            }
+            if (rolePermissions.mod && rolePermissions.mod.includes(roleId)) {
+                return 'mod';
+            }
+        }
+    }
+    return 'none';
+}
+exports('GetPermission', getPermission);
+
+on('DiscordAPI:RegisterCommand', (name, description, options = [], perms) => {
     const command = {
         name: name,
         description: description,
@@ -28,14 +136,33 @@ on('DiscordAPI:RegisterCommand', (name, description, options = []) => {
             else if (option.type === 'integer') type = 4;
             else if (option.type === 'user') type = 6;
             else if (option.type === 'channel') type = 7;
-            return {
+            
+            const mappedOption = {
                 name: option.name,
                 description: option.description,
                 type: type,
                 required: option.required || false
             };
+            
+            if (option.choices && Array.isArray(option.choices)) {
+                mappedOption.choices = option.choices;
+            }
+            
+            return mappedOption;
         })
     };
+
+    if (perms) {
+        if (perms === 'mod' && permissions.mod) {
+            permissions.mod.push(name);
+        } else if (perms === 'admin' && permissions.admin) {
+            permissions.admin.push(name);
+        } else if (perms === 'owner' && permissions.owner) {
+            permissions.owner.push(name);
+        }
+        console.log(`[DiscordAPI] Added command /${name} to ${perms} permissions`);
+    }
+
     commandData.push(command);
     luaCommands.set(name, command);
     console.log(`[DiscordAPI] Registered Lua command: /${name}`);
@@ -71,15 +198,14 @@ client.on('interactionCreate', async (interaction) => {
     if (!luaCommand) return;
 
     try {
-        // This is a Lua command, trigger the Lua event
         const interactionData = {
-            // interaction: interaction,
             commandName: interaction.commandName,
             userId: interaction.user.id,
             username: interaction.user.username,
             channelId: interaction.channelId,
             guildId: interaction.guildId,
             interactionId: interaction.id,
+            hasPermission: hasPermission(interaction.user.id, interaction.commandName),
             options: interaction.options.data.map(opt => ({
                 name: opt.name,
                 value: opt.value,
@@ -87,13 +213,10 @@ client.on('interactionCreate', async (interaction) => {
             }))
         };
         
-        // Defer the reply first so we can edit it later
         await interaction.deferReply();
         
-        // Store interaction by ID for this command execution
         pendingInteractions.set(interaction.id, interaction);
         
-        // Trigger a Lua event that can be handled
         emit('DiscordAPI:CommandExecuted', interactionData);
     } catch (error) {
         console.error(`[DiscordAPI] Error executing command ${interaction.commandName}:`, error);
@@ -118,16 +241,38 @@ client.once('ready', async () => {
     const rest = new REST({ version: '9' }).setToken(token);
     
     try {
-        console.log('[DiscordAPI] Started refreshing application (/) commands.');
-        
+        const app = await client.application.fetch();
+
+        console.log(`[DiscordAPI] Started refreshing ${commandData.length} application (/) commands.`);
         await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
-            { body: commandData }
+            Routes.applicationCommands(app.id),
+            { body: commandData },
         );
+        console.log(`[DiscordAPI] Successfully reloaded ${commandData.length} application (/) commands.`);
+
+         
+        RegisterCommand('refreshguild', async (src, args) => {
+            if (src !== 0) return;
+
+            const gId = args[0] || guildId;
+            if (!gId) {
+                console.log('Usage: /refreshguild [guildId]');
+                return;
+            }
+
+            try {
+                await rest.put(
+                    Routes.applicationGuildCommands(app.id, gId),
+                    { body: commandData },
+                );
+                console.log(`[DiscordAPI] Successfully refreshed commands for guild ${gId}`);
+            } catch (err) {
+                console.error(`[DiscordAPI] Failed to refresh commands for guild ${gId}: ${err.message}`);
+            }
+        }, true);
         
-        console.log('[DiscordAPI] Successfully reloaded application (/) commands.');
     } catch (error) {
-        console.error('[DiscordAPI] Error registering commands:', error);
+        console.error(`[DiscordAPI] Failed to register commands: ${error.message}`);
     }
 });
 

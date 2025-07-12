@@ -1,8 +1,8 @@
 local commandCB = {}
 
-function _RegisterCommand(name, description, options, cb)
+function _RegisterCommand(name, description, options, cb, perms)
     if commandCB[name] then print(('[DiscordAPI] Command already %s registered'):format(name)) return end
-    TriggerEvent('DiscordAPI:RegisterCommand', name, description, options)
+    TriggerEvent('DiscordAPI:RegisterCommand', name, description, options, perms)
     commandCB[name] = cb
 end
 exports('RegisterCommand', _RegisterCommand)

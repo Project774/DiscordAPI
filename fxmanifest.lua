@@ -12,6 +12,7 @@ server_only 'yes' --maybe
 
 server_scripts {
     'src/server/server.js',
+    'src/server/deferrals.lua',
     'src/server/commands.lua',
     'src/server/commands/*.lua',
 }

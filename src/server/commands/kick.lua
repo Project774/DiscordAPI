@@ -3,6 +3,14 @@ _RegisterCommand('kick', 'Kick a player from the server', {
     { name = 'player', description = 'Player name or ID', type = 'string', required = true },
     { name = 'reason', description = 'Reason for kick', type = 'string', required = false }
 }, function(interactionData)
+    if not interactionData.hasPermission then
+        SendResponse(interactionData.interactionId, { 
+            content = "❌ You don't have permission to use this command!", 
+            ephemeral = true 
+        })
+        return
+    end
+
     local player = nil
     local reason = 'No reason provided'
 
@@ -34,4 +42,4 @@ _RegisterCommand('kick', 'Kick a player from the server', {
     else
         SendResponse(interactionData.interactionId, { content = "❌ Player parameter is required!", ephemeral = true })
     end
-end)
+end, 'admin')
