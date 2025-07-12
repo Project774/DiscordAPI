@@ -11,7 +11,7 @@ _RegisterCommand('kick', 'Kick a player from the server', {
         return
     end
 
-    local player = interactionData.options[1] and interactionData.options[1].value
+    local player = interactionData.options[1].value
     local reason = interactionData.options[2] and interactionData.options[2].value
 
     local source = GetSource(player)
