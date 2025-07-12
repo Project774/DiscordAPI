@@ -1,0 +1,16 @@
+{
+    "name": "discord-api",
+    "version": "1.0.0",
+    "description": "DicordAPI for FiveM",
+    "main": "src/server/server.js",
+    "scripts": {
+      "start": "node src/server/server.js"
+    },
+    "dependencies": {
+      "@discordjs/rest": "^0.3.0",
+      "discord-api-types": "^0.27.3",
+      "discord.js": "^13.6.0"
+    },
+    "author": "",
+    "license": "ISC"
+  } 
