@@ -3,7 +3,7 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 
 const token = GetConvar('DiscordAPI_TOKEN', '');
-const clientId = GetConvar('DiscordAPI_CLIENT_ID', '');
+const clientId = GetConvar('DiscordAPI_CLIENT_ID', ''); // Unused now using KR's methods from salt-discord
 const guildId = GetConvar('DiscordAPI_GUILD_ID', '');
 
 const client = new Client({
@@ -39,17 +39,14 @@ const userPermissions = {
 function hasPermission(userId, commandName) {
     const guild = client.guilds.cache.get(guildId);
     let member = null;
-    
     if (guild) {
         member = guild.members.cache.get(userId);
     }
-
     if (userPermissions.mod && userPermissions.mod.includes(userId)) {
         if (permissions.mod && permissions.mod.includes(commandName)) {
             return true;
         }
     }
-    
     if (userPermissions.admin && userPermissions.admin.includes(userId)) {
         if (permissions.admin && permissions.admin.includes(commandName)) {
             return true;
@@ -58,11 +55,9 @@ function hasPermission(userId, commandName) {
             return true;
         }
     }
-    
     if (userPermissions.owner && userPermissions.owner.includes(userId)) {
         return true;
     }
-    
     if (member && member.roles) {
         for (const [roleId, role] of member.roles.cache) {
             if (rolePermissions.mod && rolePermissions.mod.includes(roleId)) {
@@ -70,7 +65,6 @@ function hasPermission(userId, commandName) {
                     return true;
                 }
             }
-            
             if (rolePermissions.admin && rolePermissions.admin.includes(roleId)) {
                 if (permissions.admin && permissions.admin.includes(commandName)) {
                     return true;
@@ -79,13 +73,11 @@ function hasPermission(userId, commandName) {
                     return true;
                 }
             }
-            
             if (rolePermissions.owner && rolePermissions.owner.includes(roleId)) {
                 return true;
             }
         }
     }
-    
     return false;
 }
 exports('HasPermission', hasPermission);
@@ -94,11 +86,9 @@ exports('HasPermission', hasPermission);
 function getPermission(userId) {
     const guild = client.guilds.cache.get(guildId);
     let member = null;
-    
     if (guild) {
         member = guild.members.cache.get(userId);
     }
-
     if (userPermissions.owner && userPermissions.owner.includes(userId)) {
         return 'owner';
     }
@@ -108,7 +98,6 @@ function getPermission(userId) {
     if (userPermissions.mod && userPermissions.mod.includes(userId)) {
         return 'mod';
     }
-    
     if (member && member.roles) {
         for (const [roleId, role] of member.roles.cache) {
             if (rolePermissions.owner && rolePermissions.owner.includes(roleId)) {
@@ -136,21 +125,35 @@ on('DiscordAPI:RegisterCommand', (name, description, options = [], perms) => {
             else if (option.type === 'integer') type = 4;
             else if (option.type === 'user') type = 6;
             else if (option.type === 'channel') type = 7;
-            
             const mappedOption = {
                 name: option.name,
                 description: option.description,
                 type: type,
                 required: option.required || false
             };
-            
             if (option.choices && Array.isArray(option.choices)) {
                 mappedOption.choices = option.choices;
             }
-            
             return mappedOption;
         })
     };
+
+    // Remove existing command from permissions if it exists
+    if (permissions.mod && permissions.mod.includes(name)) {
+        permissions.mod = permissions.mod.filter(cmd => cmd !== name);
+    }
+    if (permissions.admin && permissions.admin.includes(name)) {
+        permissions.admin = permissions.admin.filter(cmd => cmd !== name);
+    }
+    if (permissions.owner && permissions.owner.includes(name)) {
+        permissions.owner = permissions.owner.filter(cmd => cmd !== name);
+    }
+
+    // Remove existing command from commandData if it exists
+    const existingIndex = commandData.findIndex(cmd => cmd.name === name);
+    if (existingIndex !== -1) {
+        commandData.splice(existingIndex, 1);
+    }
 
     if (perms) {
         if (perms === 'mod' && permissions.mod) {
@@ -192,11 +195,8 @@ on('DiscordAPI:SendResponse', (interactionId, response) => {
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isCommand()) return;
-
     const luaCommand = luaCommands.get(interaction.commandName);
-
     if (!luaCommand) return;
-
     try {
         const interactionData = {
             commandName: interaction.commandName,
@@ -212,15 +212,11 @@ client.on('interactionCreate', async (interaction) => {
                 type: opt.type
             }))
         };
-        
         await interaction.deferReply();
-        
         pendingInteractions.set(interaction.id, interaction);
-        
         emit('DiscordAPI:CommandExecuted', interactionData);
     } catch (error) {
         console.error(`[DiscordAPI] Error executing command ${interaction.commandName}:`, error);
-        
         const errorEmbed = new MessageEmbed()
             .setColor('#ff0000')
             .setTitle('❌ Error')
@@ -237,29 +233,22 @@ client.on('interactionCreate', async (interaction) => {
 
 client.once('ready', async () => {
     console.log(`[DiscordAPI] Bot logged in as ${client.user.tag}`);
-    
     const rest = new REST({ version: '9' }).setToken(token);
-    
     try {
         const app = await client.application.fetch();
-
         console.log(`[DiscordAPI] Started refreshing ${commandData.length} application (/) commands.`);
         await rest.put(
             Routes.applicationCommands(app.id),
             { body: commandData },
         );
         console.log(`[DiscordAPI] Successfully reloaded ${commandData.length} application (/) commands.`);
-
-         
         RegisterCommand('refreshguild', async (src, args) => {
             if (src !== 0) return;
-
             const gId = args[0] || guildId;
             if (!gId) {
                 console.log('Usage: /refreshguild [guildId]');
                 return;
             }
-
             try {
                 await rest.put(
                     Routes.applicationGuildCommands(app.id, gId),
@@ -270,7 +259,6 @@ client.once('ready', async () => {
                 console.error(`[DiscordAPI] Failed to refresh commands for guild ${gId}: ${err.message}`);
             }
         }, true);
-        
     } catch (error) {
         console.error(`[DiscordAPI] Failed to register commands: ${error.message}`);
     }

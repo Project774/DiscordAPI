@@ -17,16 +17,8 @@ _RegisterCommand('resources', 'Manage server resources', {
         return
     end
 
-    local action = nil
-    local resourceName = nil
-
-    for _, option in ipairs(interactionData.options) do
-        if option.name == 'action' then
-            action = option.value
-        elseif option.name == 'resource' then
-            resourceName = option.value
-        end
-    end
+    local action = interactionData.options[1] and interactionData.options[1].value
+    local resourceName = interactionData.options[2] and interactionData.options[2].value
 
     if action ~= 'refresh' and not resourceName then
         SendResponse(interactionData.interactionId, { 

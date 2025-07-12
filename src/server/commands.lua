@@ -1,12 +1,19 @@
 local commandCB = {}
 
 function _RegisterCommand(name, description, options, cb, perms)
-    if commandCB[name] then print(('[DiscordAPI] Command already %s registered'):format(name)) return end
+    if commandCB[name] then 
+        print(('[DiscordAPI] Command %s already registered, overriding...'):format(name)) 
+    end
     TriggerEvent('DiscordAPI:RegisterCommand', name, description, options, perms)
     commandCB[name] = cb
 end
 exports('RegisterCommand', _RegisterCommand)
 
+-- Probably exploitable but i like
+function ExecuteGameCommand(...)
+    ExecuteCommand(...)
+end
+exports('ExecuteGameCommand', ExecuteGameCommand)
 
 function SendResponse(interactionId, response, callback)
     if callback then

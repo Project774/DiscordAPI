@@ -353,6 +353,58 @@ The system provides console commands for server management:
 ### `refreshguild [guildId]`
 Refreshes Discord slash commands for a specific guild or the default guild.
 
+## 🛠️ Utility Functions
+
+The DiscordAPI provides utility functions for common operations:
+
+### `IsDiscordID(id)`
+Checks if a string is a valid Discord ID format.
+
+```lua
+local DiscordAPI = exports['DiscordAPI']
+
+-- Check if string is Discord ID format
+local isDiscord = DiscordAPI:IsDiscordID("<@123456789012345678>") -- Returns true (this is how its sent from discord so this is what we got to check with @ the person)
+local isNotDiscord = DiscordAPI:IsDiscordID("123456789012345678") -- Returns false
+```
+
+### `GetSource(id)`
+Converts a Discord ID or player ID to a FiveM source ID.
+
+```lua
+local DiscordAPI = exports['DiscordAPI']
+
+-- Get source from Discord ID
+local source = DiscordAPI:GetSource("<@123456789012345678>")
+-- Returns the FiveM source ID if player is online, nil otherwise
+
+-- Get source from player ID (passes through unchanged)
+local source = DiscordAPI:GetSource("1")
+-- Returns 1 (converted to number)
+```
+
+**Usage Examples:**
+```lua
+-- In a kick command
+DiscordAPI:RegisterCommand('kick', 'Kick a player', {
+    { name = 'player', description = 'Player or Discord ID', type = 'string', required = true }
+}, function(interactionData)
+    local playerId = interactionData.options[1].value
+    local source = DiscordAPI:GetSource(playerId)
+    
+    if source then
+        -- Kick the player
+        DropPlayer(source, "Kicked by admin")
+    else
+        -- Player not found
+        DiscordAPI:SendResponse(interactionData.interactionId, { 
+            content = "❌ Player not found!", 
+            ephemeral = true 
+        })
+    end
+end, 'mod')
+```
+
 ## 🛠️ Advanced Features
 
 ### Multiple Users Support
@@ -376,6 +428,28 @@ Built-in commands include safety features:
 - Prevents restarting the DiscordAPI resource itself
 - Validates resource names before execution
 - Proper error handling for failed operations
+
+### Command Override System
+
+The system supports command overriding for easy development and updates:
+
+```lua
+-- First registration
+_RegisterCommand('ping', 'Old ping command', {}, function(data)
+    -- Old logic
+end, 'mod')
+
+-- Later, override with new version
+_RegisterCommand('ping', 'New improved ping command', {}, function(data)
+    -- New logic
+end, 'admin') -- Even changed permission level!
+```
+
+**Features:**
+- ✅ **No blocking**: Commands can be redefined without errors
+- ✅ **Clean overrides**: Old permissions and data are properly cleaned up
+- ✅ **Development friendly**: Easy to test and iterate on commands
+- ✅ **Hot reloading**: Commands can be updated without restarting
 
 ## 📁 File Structure
 

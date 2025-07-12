@@ -11,35 +11,15 @@ _RegisterCommand('kick', 'Kick a player from the server', {
         return
     end
 
-    local player = nil
-    local reason = 'No reason provided'
+    local player = interactionData.options[1] and interactionData.options[1].value
+    local reason = interactionData.options[2] and interactionData.options[2].value
 
-    for _, option in ipairs(interactionData.options) do
-        if option.name == 'player' then
-            player = option.value
-        elseif option.name == 'reason' then
-            reason = option.value
-        end
-    end
+    local source = GetSource(player)
 
-    if player then
-        local players = GetPlayers()
-        local targetPlayer = nil
-        
-        for i = 1, #players do
-            if GetPlayerName(players[i]) == player or tostring(players[i]) == player then
-                targetPlayer = players[i]
-                break
-            end
-        end
-        
-        if targetPlayer then
-            DropPlayer(targetPlayer, reason)
-            SendResponse(interactionData.interactionId, { content = string.format("✅ Kicked %s for: %s", player, reason) })
-        else
-            SendResponse(interactionData.interactionId, { content = "❌ Player not found!", ephemeral = true })
-        end
+    if source then
+        DropPlayer(source, reason or 'No reason provided')
+        SendResponse(interactionData.interactionId, { content = string.format("✅ Kicked %s for: %s", player, reason or 'No reason provided') })
     else
-        SendResponse(interactionData.interactionId, { content = "❌ Player parameter is required!", ephemeral = true })
+        SendResponse(interactionData.interactionId, { content = "❌ Player not found!", ephemeral = true })
     end
 end, 'admin')
