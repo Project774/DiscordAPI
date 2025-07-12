@@ -12,7 +12,7 @@ _RegisterCommand('kick', 'Kick a player from the server', {
     end
 
     local player = interactionData.options[1].value
-    local reason = interactionData.options[2] and interactionData.options[2].value
+    local reason = interactionData.options[2] and interactionData.options[2].value -- like this because its not required so could be nil
 
     local source = GetSource(player)
 

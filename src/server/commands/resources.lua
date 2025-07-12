@@ -17,7 +17,7 @@ _RegisterCommand('resources', 'Manage server resources', {
         return
     end
 
-    local action = interactionData.options[1] and interactionData.options[1].value
+    local action = interactionData.options[1].value
     local resourceName = interactionData.options[2] and interactionData.options[2].value
 
     if action ~= 'refresh' and not resourceName then
